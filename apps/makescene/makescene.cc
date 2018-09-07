@@ -364,6 +364,14 @@ import_bundle_nvm (AppSettings const& conf)
         mve::NVMCameraInfo const& nvm_cam = nvm_cams[i];
         std::string fname = "view_" + util::string::get_filled(i, 4) + ".mve";
 
+		// skip if the undistorted.png exist
+		std::string undistor_png = util::fs::join_path(conf.views_path, fname);
+		undistor_png = util::fs::abspath(undistor_png + "/undistorted.png");
+		if (util::fs::file_exists(undistor_png.c_str())) {
+			std::cout << "already exist, skip " << fname << std::endl;
+			continue; 
+		}
+
         mve::View::Ptr view = mve::View::create();
         view->set_id(i);
         view->set_name(util::string::get_filled(i, 4, '0'));
