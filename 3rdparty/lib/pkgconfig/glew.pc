@@ -1,0 +1,11 @@
+prefix=D:/Libraries/Documents/Program/mve/src/3rdparty
+exec_prefix=${prefix}
+libdir=D:/Libraries/Documents/Program/mve/src/3rdparty/lib
+includedir=${prefix}/include
+
+Name: glew
+Description: The OpenGL Extension Wrangler library
+Version: 2.0.0
+Cflags: -I${includedir} 
+Libs: -L${libdir} -lglew32
+Requires: glu

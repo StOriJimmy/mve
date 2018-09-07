@@ -1,0 +1,11 @@
+prefix=D:/Libraries/Documents/Program/mve/src/3rdparty
+exec_prefix=D:/Libraries/Documents/Program/mve/src/3rdparty
+libdir=D:/Libraries/Documents/Program/mve/src/3rdparty/lib
+includedir=D:/Libraries/Documents/Program/mve/src/3rdparty/include
+
+Name: libtiff
+Description:  Tag Image File Format (TIFF) library.
+Version: 4.0.9
+Libs: -LD:/Libraries/Documents/Program/mve/src/3rdparty/lib -ltiff
+Libs.private: 
+Cflags: -ID:/Libraries/Documents/Program/mve/src/3rdparty/include
