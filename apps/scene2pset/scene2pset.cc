@@ -267,7 +267,7 @@ main (int argc, char** argv)
 #else
     for (int64_t i = 0; i < views.size(); ++i)
 #endif
-		{
+    {
         mve::View::Ptr view = views[i];
         if (view == nullptr)
             continue;

@@ -122,6 +122,13 @@ load_file_headers (std::string const& filename)
         catch (util::Exception&) {}
 #endif
 
+#ifndef MVE_NO_TIFF_SUPPORT
+        try
+        { return load_tiff_file_headers(filename); }
+        catch (util::FileException&) { throw; }
+        catch (util::Exception&) {}
+#endif
+
         try
         { return load_mvei_file_headers(filename); }
         catch (util::FileException&) { throw; }
@@ -628,6 +635,104 @@ tiff_error_handler (char const* /*module*/, char const* fmt, va_list ap)
     throw util::Exception(msg);
 }
 
+ImageHeaders
+load_tiff_file_headers (std::string const& filename)
+{
+    ImageHeaders headers;
+    TIFFSetWarningHandler(nullptr);
+    TIFFSetErrorHandler(tiff_error_handler);
+
+    TIFF* tif = TIFFOpen(filename.c_str(), "r");
+    if (tif == nullptr)
+        throw util::FileException(filename, "TIFF file format not recognized");
+
+    try
+    {
+        uint32 width, height;
+        uint16 channels, bits, sampleFormat;
+        TIFFGetField(tif, TIFFTAG_IMAGEWIDTH, &width);
+        TIFFGetField(tif, TIFFTAG_IMAGELENGTH, &height);
+        TIFFGetField(tif, TIFFTAG_SAMPLESPERPIXEL, &channels);
+        TIFFGetField(tif, TIFFTAG_BITSPERSAMPLE, &bits);
+        TIFFGetField(tif, TIFFTAG_SAMPLEFORMAT, &sampleFormat);
+
+        headers.width = width;
+        headers.height = height;
+        headers.channels = channels;
+        headers.type = IMAGE_TYPE_UNKNOWN;
+
+        if (bits == 8) {
+            switch(sampleFormat) {
+                case SAMPLEFORMAT_UINT:
+                    headers.type = IMAGE_TYPE_UINT8;
+                    break;
+                case SAMPLEFORMAT_INT:
+                    headers.type = IMAGE_TYPE_SINT8;
+                    break;
+                case SAMPLEFORMAT_IEEEFP:
+                    headers.type = IMAGE_TYPE_FLOAT;
+                    break;
+                default:
+                    break;
+            }
+        } else if (bits == 16) {
+            switch(sampleFormat) {
+                case SAMPLEFORMAT_UINT:
+                    headers.type = IMAGE_TYPE_UINT16;
+                    break;
+                case SAMPLEFORMAT_INT:
+                    headers.type = IMAGE_TYPE_SINT16;
+                    break;
+                case SAMPLEFORMAT_IEEEFP:
+                    headers.type = IMAGE_TYPE_FLOAT;
+                    break;
+                default:
+                    break;
+            }
+        } else if (bits == 32) {
+            switch(sampleFormat) {
+                case SAMPLEFORMAT_UINT:
+                    headers.type = IMAGE_TYPE_UINT32;
+                    break;
+                case SAMPLEFORMAT_INT:
+                    headers.type = IMAGE_TYPE_SINT32;
+                    break;
+                case SAMPLEFORMAT_IEEEFP:
+                    headers.type = IMAGE_TYPE_FLOAT;
+                    break;
+                default:
+                    break;
+            }
+        } else if (bits == 64) {
+            switch(sampleFormat) {
+                case SAMPLEFORMAT_UINT:
+                    headers.type = IMAGE_TYPE_UINT64;
+                    break;
+                case SAMPLEFORMAT_INT:
+                    headers.type = IMAGE_TYPE_SINT64;
+                    break;
+                case SAMPLEFORMAT_IEEEFP:
+                    headers.type = IMAGE_TYPE_FLOAT;
+                    break;
+                default:
+                    break;
+            }
+        }
+
+        if (headers.type == IMAGE_TYPE_UNKNOWN){
+            throw util::Exception("TIFF file has unsupported bits and/or sample format.");
+        }
+
+        TIFFClose(tif);
+        return headers;
+    }
+    catch (std::exception& e)
+    {
+        TIFFClose(tif);
+        throw;
+    }
+}
+
 ByteImage::Ptr
 load_tiff_file (std::string const& filename)
 {
@@ -791,7 +896,7 @@ save_tiff_16_file (RawImage::ConstPtr image, std::string const& filename)
 FloatImage::Ptr
 load_pfm_file (std::string const& filename)
 {
-    std::ifstream in(filename.c_str());
+    std::ifstream in(filename.c_str(), std::ios::binary);
     if (!in.good())
         throw util::FileException(filename, std::strerror(errno));
 
@@ -904,7 +1009,7 @@ save_pfm_file (FloatImage::ConstPtr image, std::string const& filename)
 ImageBase::Ptr
 load_ppm_file_intern (std::string const& filename, bool bit8)
 {
-    std::ifstream in(filename.c_str());
+    std::ifstream in(filename.c_str(), std::ios::binary);
     if (!in.good())
         throw util::FileException(filename, std::strerror(errno));
 

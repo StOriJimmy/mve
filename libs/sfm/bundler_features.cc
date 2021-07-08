@@ -41,9 +41,9 @@ Features::compute (mve::Scene::Ptr scene, ViewportList* viewports)
 #ifdef _MSC_VER
     for (int64_t i = 0; i < views.size(); ++i)
 #else
-	for (std::size_t i = 0; i < views.size(); ++i)
+    for (std::size_t i = 0; i < views.size(); ++i)
 #endif
-	{
+    {
 #pragma omp critical
         {
             num_done += 1;

@@ -416,9 +416,9 @@ sfm_reconstruct (AppSettings const& conf)
 #ifndef _MSC_VER
     for (std::size_t i = 0; i < bundle_cams.size(); ++i)
 #else
-	for (int64_t i = 0; i < bundle_cams.size(); ++i)
+    for (int64_t i = 0; i < bundle_cams.size(); ++i)
 #endif
-	{
+    {
         mve::View::Ptr view = views[i];
         mve::CameraInfo const& cam = bundle_cams[i];
         if (view == nullptr)

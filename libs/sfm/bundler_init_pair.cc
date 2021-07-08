@@ -49,7 +49,7 @@ InitialPair::compute_pair (Result* result)
 #ifdef _MSC_VER
     for (int64_t i = 0; i < candidates.size(); ++i)
 #else
-	for (std::size_t i = 0; i < candidates.size(); ++i)
+    for (std::size_t i = 0; i < candidates.size(); ++i)
 #endif
     {
         if (found_pair)

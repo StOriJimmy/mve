@@ -10,21 +10,21 @@ endif()
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED yes)
 
-# Warning flags
+# Compiler flags
 if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
-    string(APPEND CMAKE_CXX_FLAGS " /W3")
+    add_compile_options(/W3)
 elseif(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-    string(APPEND CMAKE_CXX_FLAGS " -Wall -Wextra -Wundef -pedantic")
-    string(APPEND CMAKE_CXX_FLAGS " -mpopcnt")
+    add_compile_options(-Wall -Wextra -Wundef -pedantic)
+    add_compile_options(-mpopcnt)
 elseif(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
-    string(APPEND CMAKE_CXX_FLAGS " -Weverything -pedantic")
+    add_compile_options(-Weverything -pedantic)
 endif()
 
 if(WIN32)
     add_definitions(-DWIN32_LEAN_AND_MEAN -DVC_EXTRALEAN -DNOMINMAX)
     add_definitions(-D_CRT_SECURE_NO_WARNINGS)
     if(MSVC)
-        string(APPEND CMAKE_CXX_FLAGS " /MP")
+        add_compile_options(/MP)
         option(MVE_BUILD_WITH_SSE2 "Build MVE with SSE2 support" ON)
         option(MVE_BUILD_WITH_SSE3 "Build MVE with SSE3 support" ON)
         if(MVE_BUILD_WITH_SSE2)
@@ -44,7 +44,7 @@ endif()
 include(CPack)
 
 find_package(OpenMP REQUIRED)
-string(APPEND CMAKE_CXX_FLAGS " ${OpenMP_CXX_FLAGS}")
+add_compile_options(${OpenMP_CXX_FLAGS})
 
 include_directories(libs)
 
@@ -56,13 +56,19 @@ add_subdirectory(apps)
 if(WIN32)
     set(LIBPNG_DLL_DEBUG "3rdparty/bin/libpng16d.dll")
     set(LIBPNG_DLL_RELEASE "3rdparty/bin/libpng16.dll")
+    set(ZLIB_DLL_DEBUG "3rdparty/bin/zlibd.dll")
     set(ZLIB_DLL_RELEASE "3rdparty/bin/zlib.dll")
+    set(LIBTIFF_DLL_DEBUG "3rdparty/bin/tiffd.dll")
     set(LIBTIFF_DLL_RELEASE "3rdparty/bin/tiff.dll")
+    set(GLEW_DLL_DEBUG "3rdparty/bin/glew32d.dll")
     set(GLEW_DLL_RELEASE "3rdparty/bin/glew32.dll")
+    set(LIBJPEG_TURBO_DEBUG "3rdparty/bin/jpeg62d.dll")
+    set(LIBJPEG_TURBO_RELEASE "3rdparty/bin/jpeg62.dll")
     install(FILES ${LIBPNG_DLL_RELEASE} ${ZLIB_DLL_RELEASE}
-        ${LIBTIFF_DLL_RELEASE} ${GLEW_DLL_RELEASE}
+        ${LIBTIFF_DLL_RELEASE} ${GLEW_DLL_RELEASE} ${LIBJPEG_TURBO_RELEASE}
         DESTINATION . CONFIGURATIONS Release RelWithDebInfo)
-    install(FILES ${LIBPNG_DLL_DEBUG} ${ZLIB_DLL_RELEASE}
-        ${LIBTIFF_DLL_RELEASE} DESTINATION . CONFIGURATIONS Debug)
+    install(FILES ${LIBPNG_DLL_DEBUG} ${ZLIB_DLL_DEBUG}
+        ${LIBTIFF_DLL_DEBUG} ${GLEW_DLL_DEBUG} ${LIBJPEG_TURBO_DEBUG}
+        DESTINATION . CONFIGURATIONS Debug)
 endif()
 

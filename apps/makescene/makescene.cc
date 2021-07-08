@@ -24,6 +24,7 @@
 #include <string>
 #include <algorithm>
 #include <atomic>
+#include <unordered_map>
 
 #include "math/matrix.h"
 #include "math/matrix_tools.h"
@@ -105,9 +106,8 @@ read_noah_imagelist (std::string const& filename, StringVector& files)
 
     while (true)
     {
-        std::string file, dummy;
-        in >> file;
-        std::getline(in, dummy);
+        std::string file;
+        std::getline(in, file);
         if (file.empty())
             break;
         files.push_back(file);
@@ -357,7 +357,7 @@ import_bundle_nvm (AppSettings const& conf)
 #if !defined(_MSC_VER)
     for (std::size_t i = 0; i < cameras.size(); ++i)
 #else
-    for (int i = 0; i < cameras.size(); ++i)
+    for (int64_t i = 0; i < cameras.size(); ++i)
 #endif
     {
         mve::CameraInfo& mve_cam = cameras[i];
@@ -378,12 +378,33 @@ import_bundle_nvm (AppSettings const& conf)
 
         /* Load original image. */
         std::string exif;
-        mve::ByteImage::Ptr image = load_8bit_image(nvm_cam.filename, &exif);
+        mve::ImageBase::Ptr image = load_any_image(nvm_cam.filename, &exif);
         if (image == nullptr)
         {
             std::cout << "Error loading: " << nvm_cam.filename
                 << " (skipping " << fname << ")" << std::endl;
             continue;
+        }
+
+        switch (image->get_type()) {
+            case mve::IMAGE_TYPE_FLOAT:{
+                mve::FloatImage::Ptr temp = std::dynamic_pointer_cast<mve::FloatImage>(image);
+                float vmin, vmax;
+                find_min_max_percentile(temp, &vmin, &vmax);
+                image = mve::image::float_to_byte_image(temp, vmin, vmax);
+                break;
+            }
+            case mve::IMAGE_TYPE_UINT16:{
+                mve::RawImage::Ptr temp = std::dynamic_pointer_cast<mve::RawImage>(image);
+                uint16_t vmin, vmax;
+                find_min_max_percentile(temp, &vmin, &vmax);
+                image = mve::image::raw_to_byte_image(temp, vmin, vmax);
+                break;
+            }
+            case mve::IMAGE_TYPE_UINT8:
+            default:
+                /* No conversion needed */
+                break;
         }
 
         /* Add original image. */
@@ -402,7 +423,7 @@ import_bundle_nvm (AppSettings const& conf)
         mve_cam.flen = mve_cam.flen / static_cast<float>(maxdim);
 
         mve::ByteImage::Ptr undist = mve::image::image_undistort_vsfm<uint8_t>
-            (image, mve_cam.flen, nvm_cam.radial_distortion);
+            (std::dynamic_pointer_cast<mve::ByteImage const>(image), mve_cam.flen, nvm_cam.radial_distortion);
         undist = limit_image_size<uint8_t>(undist, conf.max_pixels);
         view->set_image(undist, "undistorted");
         view->set_camera(mve_cam);
@@ -547,10 +568,41 @@ import_bundle_noah_ps (AppSettings const& conf)
         util::fs::join_path(conf.output_path, "synth_0.out"));
 
     /* Save MVE views. */
-    int num_valid_cams = 0;
-    int undist_imported = 0;
+    std::atomic<int> num_valid_cams(0);
+    std::atomic<int> undist_imported(0);
     mve::Bundle::Cameras const& cams = bundle->get_cameras();
+
+    /* We precompute the IDs of the photo synth cameras
+     * in advance since they are sequential and the process
+     * loop is parallel */
+    std::unordered_map<size_t, int> photo_synth_cam_ids;
+
+    if (bundler_fmt == BUNDLE_FORMAT_PHOTOSYNTHER)
+    {
+        for (std::size_t i = 0; i < cams.size(); ++i)
+        {
+            /* Skip invalid cameras... */
+            mve::CameraInfo cam = cams[i];
+            if (cam.flen == 0.0f && conf.skip_invalid)
+            {
+                continue;
+            }
+
+            photo_synth_cam_ids[i] = num_valid_cams;
+
+            if (cam.flen != 0.0f)
+                num_valid_cams += 1;
+        }
+    }
+
+    num_valid_cams = 0;
+
+    #pragma omp parallel for
+#if !defined(_MSC_VER)
     for (std::size_t i = 0; i < cams.size(); ++i)
+#else
+    for (int64_t i = 0; i < cams.size(); ++i)
+#endif
     {
         /*
          * For each camera in the bundle file, a new view is created.
@@ -618,8 +670,6 @@ import_bundle_noah_ps (AppSettings const& conf)
         view->set_name(view_name);
         view->set_camera(cam);
 
-        /* FIXME: Handle exceptions while loading images? */
-
         /* Load undistorted and original image, create thumbnail. */
         mve::ByteImage::Ptr original, undist, thumb;
         std::string exif;
@@ -631,8 +681,8 @@ import_bundle_noah_ps (AppSettings const& conf)
             original = load_8bit_image(orig_fname, &exif);
             if (original == nullptr)
             {
-                std::cerr << "Error loading: " << orig_fname << std::endl;
-                std::exit(EXIT_FAILURE);
+                std::cerr << "Error loading: " << orig_fname << " (skipping)" << std::endl;
+                continue;
             }
             thumb = create_thumbnail(original);
 
@@ -657,11 +707,11 @@ import_bundle_noah_ps (AppSettings const& conf)
             std::string undist_new_filename
                 = util::fs::join_path(undist_path, "forStereo_"
                 + util::string::get_filled(conf.bundle_id, 4) + "_"
-                + util::string::get_filled(num_valid_cams, 4) + ".png");
+                + util::string::get_filled(photo_synth_cam_ids[i], 4) + ".png");
             std::string undist_old_filename
                 = util::fs::join_path(undist_path, "undistorted_"
                 + util::string::get_filled(conf.bundle_id, 4) + "_"
-                + util::string::get_filled(num_valid_cams, 4) + ".jpg");
+                + util::string::get_filled(photo_synth_cam_ids[i], 4) + ".jpg");
 
             /* Try the newer file name and fall back if not existing. */
             try
@@ -673,13 +723,13 @@ import_bundle_noah_ps (AppSettings const& conf)
             }
             catch (util::FileException &e)
             {
-                std::cerr << e.filename << ": " << e.what() << std::endl;
-                std::exit(EXIT_FAILURE);
+                std::cerr << e.filename << ": " << e.what() << " (skipping)" << std::endl;
+                continue;
             }
             catch (util::Exception &e)
             {
-                std::cerr << e.what() << std::endl;
-                std::exit(EXIT_FAILURE);
+                std::cerr << e.what() << " (skipping)" << std::endl;
+                continue;
             }
 
             /* Create thumbnail. */
